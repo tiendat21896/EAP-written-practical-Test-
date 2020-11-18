@@ -1,23 +1,55 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Web;
 using System.Web.Mvc;
 
-namespace EmployeeManager.Controllers
+namespace EmployeeConsumer.Controllers
 {
     public class EmployeeController : Controller
     {
+        ServicesClient servicesClient = new ServicesClient();
+
         // GET: Employee
-        public ActionResult Index()
+        public ViewResult Index(string sortOrder, string search, string currentFilter, int? page)
         {
-            return View();
+            ViewBag.CurrentSort = sortOrder;
+            ViewBag.NameSortParm = String.IsNullOrEmpty(sortOrder) ? "name_desc" : "";
+            /*            ViewBag.listLocation = servicesClient.getAllLocations();
+            */
+            if (search != null)
+            {
+                page = 1; // nếu search có giá trị trả về page = 1
+            }
+            else
+            {
+                search = currentFilter; //  nếu có thì render phần dữ liệu search ra
+            }
+            ViewBag.CurrentFilter = search;
+            var employees = from s in servicesClient.GetEmployees() select s;
+            if (!String.IsNullOrEmpty(search)) // check nếu search string có thì in ra hoặc không thì không in ra
+            {
+                employees = employees.Where(s => s.Department.DepartmentName.Contains(search) || s.Department.DepartmentName.Contains(search)); // contains là để check xem lastname hoặc firstName có chứa search string ở trên 
+            }
+            switch (sortOrder)
+            {
+                case "name desc":
+                    employees = employees.OrderByDescending(s => s.Department.DepartmentName); // các case tương đương với các cột muốn sort
+                    break;
+
+                default:
+                    employees = employees.OrderBy(s => s.Department.DepartmentName);
+                    break;
+            }
+
+            return View(employees.ToList());
+            /*return View();*/
         }
+
 
         // GET: Employee/Details/5
         public ActionResult Details(int id)
         {
-            return View();
+            var employee = servicesClient.GetEmployees().Where(b => b.EmployeeID == id).FirstOrDefault();
+            return View(employee);
         }
 
         // GET: Employee/Create
@@ -28,10 +60,18 @@ namespace EmployeeManager.Controllers
 
         // POST: Employee/Create
         [HttpPost]
-        public ActionResult Create(FormCollection collection)
+        [ValidateAntiForgeryToken]
+
+        public ActionResult Create(Employee newEmp)
         {
             try
             {
+                if (ModelState.IsValid)
+                {
+                    servicesClient.AddEmployee(newEmp);
+                    return RedirectToAction("Index", "Employee");
+                }
+
                 // TODO: Add insert logic here
 
                 return RedirectToAction("Index");
